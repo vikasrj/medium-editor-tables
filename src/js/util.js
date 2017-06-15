@@ -20,27 +20,37 @@ function getSelectionText(doc) {
 }
 
 function getSelectionStart(doc) {
-    var node = doc.getSelection().baseNode ? doc.getSelection().baseNode : doc.getSelection().anchorNode,
+    var tempNode = doc.getSelection().baseNode ? doc.getSelection().baseNode : doc.getSelection().anchorNode,
+        node = $(tempNode).closest('td').find('li').length === 0 ? ($(tempNode).closest('td')[0]) : tempNode,
         startNode = (node && node.nodeType === 3 ? node.parentNode : node);
 
     return startNode;
 }
 
 function placeCaretAtNode(doc, node, before) {
+    var isIE = /*@cc_on!@*/false || !!document.documentMode;
     if (doc.getSelection !== undefined && node) {
-        var range = doc.createRange(),
-            selection = doc.getSelection();
+        if (!isIE) {
+            var range = doc.createRange(),
+                selection = doc.getSelection();
 
-        if (before) {
-            range.setStartBefore(node);
+            if (before) {
+                range.setStartBefore(node);
+            } else {
+                range.setStartAfter(node);
+            }
+
+            range.collapse(true);
+
+            selection.removeAllRanges();
+            selection.addRange(range);
         } else {
-            range.setStartAfter(node);
+            var rangeObj = document.body.createTextRange();
+            rangeObj.moveToElementText(node);
+            rangeObj.moveStart('character', 0);
+            rangeObj.collapse(true);
+            rangeObj.select();
         }
-
-        range.collapse(true);
-
-        selection.removeAllRanges();
-        selection.addRange(range);
     }
 }
 

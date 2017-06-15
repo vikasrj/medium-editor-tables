@@ -15,7 +15,7 @@ Table.prototype = {
         var html = this._html(rows, cols);
 
         this._editor.pasteHTML(
-            '<table class="medium-editor-table" id="medium-editor-table"' +
+            '<table class="medium-editor-table table-resizable" id="medium-editor-table"' +
             ' width="100%">' +
             '<tbody id="medium-editor-table-tbody">' +
             html +
@@ -36,6 +36,17 @@ Table.prototype = {
         table.removeAttribute('id');
         placeCaretAtNode(this._doc, table.querySelector('td'), true);
 
+        //Resize stuff code here;
+        var _this = this,
+            newTableObject = $('.table-resizable').not('.ui-resizable');
+        $(newTableObject).resizable({
+            resize: function (event, element) {
+                _this._editor.trigger('editableInput');
+            }
+        });
+
+        this._editor.trigger('domUpdated', 'table_added');
+        this._editor.trigger('focusEditor', this);
         this._editor.checkSelection();
     },
 
@@ -44,6 +55,9 @@ Table.prototype = {
             x, y,
             text = getSelectionText(this._doc);
 
+        if (!text) {
+            text = '<br />';
+        }
         for (x = 0; x <= rows; x++) {
             html += '<tr>';
             for (y = 0; y <= cols; y++) {
@@ -71,13 +85,18 @@ Table.prototype = {
             e.preventDefault();
             e.stopPropagation();
             table = this._getTableElements(el);
-            if (e.shiftKey) {
-                this._tabBackwards(el.previousSibling, table.row);
-            } else {
+            if (!e.shiftKey) {
                 if (this._isLastCell(el, table.row, table.root)) {
-                    this._insertRow(getParentOf(el, 'tbody'), table.row.cells.length);
+                    var p = this._doc.createElement('p');
+                    p.innerHTML = '<br>';
+                    var node = getParentOf(el, 'table');
+                    $(node).after(p);
+                    e.preventDefault();
+                    placeCaretAtNode(this._doc, node);
+                    MediumEditor.selection.moveCursor(this._doc, node.nextSibling);
+                } else {
+                    this._tabForwords(el, table.row);
                 }
-                placeCaretAtNode(this._doc, el);
             }
         }
     },
@@ -88,6 +107,31 @@ Table.prototype = {
             row: getParentOf(el, 'tr'),
             root: getParentOf(el, 'table')
         };
+    },
+
+    _tabForwords: function (el, row) {
+        var isIE = /*@cc_on!@*/false || !!document.documentMode,
+        isFirefox = typeof InstallTrigger !== 'undefined',
+        isChrome = !!window.chrome && !!window.chrome.webstore;
+        if (isIE) {
+            if (this._isLastCellOfRow(el, row)) {
+                el = row.nextSibling.firstChild;
+                placeCaretAtNode(this._doc, el);
+            } else {
+                placeCaretAtNode(this._doc, el.nextSibling);
+            }
+        } else if (isFirefox) {
+            if (this._isLastCellOfRow(el, row)) {
+                el = row.nextSibling.firstChild;
+                placeCaretAtNode(this._doc, el);
+                MediumEditor.selection.moveCursor(this._doc, el);
+            } else {
+                placeCaretAtNode(this._doc, el);
+                MediumEditor.selection.moveCursor(this._doc, el.nextSibling);
+            }
+        } else {
+            placeCaretAtNode(this._doc, el);
+        }
     },
 
     _tabBackwards: function (el, row) {
@@ -112,6 +156,10 @@ Table.prototype = {
           (row.cells.length - 1) === el.cellIndex &&
           (table.rows.length - 1) === row.rowIndex
         );
+    },
+
+    _isLastCellOfRow: function (el, row) {
+        return (row.cells.length - 1) === el.cellIndex;
     },
 
     _getPreviousRowLastCell: function (row) {
